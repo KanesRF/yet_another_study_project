@@ -1,0 +1,5 @@
+
+DROP DATABASE IF EXISTS simple_db;
+DROP USER IF EXISTS db_worker;
+CREATE USER db_worker WITH ENCRYPTED PASSWORD 'simplepassword';
+CREATE DATABASE simple_db WITH OWNER db_worker;
