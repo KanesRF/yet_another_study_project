@@ -3,47 +3,70 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"strings"
 	"html/template"
+	"encoding/json"
 	"../user"
 	"time"
 )
 
 
+
+
+func LoginPOST(w http.ResponseWriter, r *http.Request){
+	defer func(w http.ResponseWriter, r *http.Request) {
+        if err := recover(); err != nil {
+			http.Error(w, "", http.StatusInternalServerError)
+        }
+    }(w, r)
+	var creds user.AuthCreds
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil{
+		http.Error(w, "You must enter name and password using JSON!", http.StatusBadRequest)
+		return
+	}
+	fmt.Println(creds)
+	if creds.Password == "" || creds.User == ""{
+		http.Error(w, "You must enter name and password", http.StatusBadRequest)
+		return;
+	}
+	if !user.AuthByPassword(creds.Password, creds.User){
+		http.Error(w, "Wrong username or password", http.StatusUnauthorized)
+		return
+	}
+	accessTocken, err := user.GenerateJwtTocken(time.Now().Add(5 * time.Minute), creds.User)
+	if err != nil{
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:    "token",
+		Value:   accessTocken,
+		HttpOnly : true,
+	})
+	fmt.Fprintf(w,"Successfully signed in")
+	fmt.Println(accessTocken)
+
+}
+
+func LoginGET(w http.ResponseWriter, r *http.Request){
+	if r.Method == "GET"{
+		tokenCookie, err := r.Cookie("token")
+		if err != nil {
+			fmt.Fprintf(w, "Hello login page with now cookies!")
+		}
+		fmt.Fprintf(w, "Hello login page! %v", tokenCookie.Value)
+	}
+}
+
 func Login(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Method:", r.Method)
-	if r.Method == "GET" {
-		t, err := template.ParseFiles("./forms/mainpage.html")
-		if err != nil{
-			fmt.Println("Cant parse")
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("500 - Server got some error!"))
-			return
-		}
-		t.Execute(w, nil)
-	} else if r.Method == "POST"{
-		r.ParseForm()
-		password := r.FormValue("password")
-		username := r.FormValue("username")
-		if password == "" || username == ""{
-			w.Write([]byte("You must enter name and password!"))
-			return
-		}
-		token := user.GenerateTocken([]byte(password))
-		if token == ""{
-			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte("500 - Server got some error!"))
-			return
-		}
-		var dur time.Time = time.Now()
-		dur.Add(time.Minute * 25)
-		tokenCookie := &http.Cookie{Name: "SessionID", Value: token, HttpOnly: true}
-		http.SetCookie(w, tokenCookie)
-
-		fmt.Println("User:", r.Form["username"])
-		fmt.Println("Password:", r.Form["password"])
-		
-
+	switch r.Method{
+	case "GET":
+		LoginGET(w, r)
+	case "POST":
+		LoginPOST(w, r)
+	default:
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 }
 
@@ -62,14 +85,15 @@ func Register(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func SayhelloName(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
-	fmt.Println("path", r.URL.Path)
-	fmt.Println("scheme", r.URL.Scheme)
-	fmt.Println(r.Form["url_long"])
-	for k, v := range r.Form {
-		fmt.Println("key:", k)
-		fmt.Println("val:", strings.Join(v, ""))
+func MainMage(w http.ResponseWriter, r *http.Request) {
+	if r.Method == "GET"{
+		tokenCookie, err := r.Cookie("token")
+		if err != nil {
+			fmt.Println("No cookie")
+			fmt.Fprintf(w, "Hello main page with now cookies!")
+			return;
+		}
+		fmt.Println(tokenCookie)
+		fmt.Fprintf(w, "Hello main page!")
 	}
-	fmt.Fprintf(w, "Hello astaxie!")
 }
