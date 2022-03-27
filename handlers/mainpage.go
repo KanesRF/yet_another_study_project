@@ -5,35 +5,10 @@ import (
 	"net/http"
 	"strings"
 	"html/template"
-	"crypto/rand"
-	"crypto/sha512"
-	"encoding/base64"
+	"../user"
 	"time"
 )
 
-func GenerateSalt(saltSize int)[]byte{
-	var salt = make([]byte, saltSize)
-	_, err := rand.Read(salt)
-	if err != nil{
-		return nil
-	}
-	return salt
-}
-
-func GenerateTocken(password []byte)string{
-	salt := GenerateSalt(16)
-	if salt == nil{
-		return ""
-	}
-	var sha512 = sha512.New()
-	var passwordWithSalt = make([]byte, 64)
-	passwordWithSalt = append(passwordWithSalt, password...)
-	passwordWithSalt = append(passwordWithSalt, salt...)
-	sha512.Write(passwordWithSalt)
-   	hashPassword := sha512.Sum(nil)
-	var encodedHash = base64.URLEncoding.EncodeToString(hashPassword)
-	return encodedHash
-}
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Method:", r.Method)
@@ -54,7 +29,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte("You must enter name and password!"))
 			return
 		}
-		token := GenerateTocken([]byte(password))
+		token := user.GenerateTocken([]byte(password))
 		if token == ""{
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte("500 - Server got some error!"))
