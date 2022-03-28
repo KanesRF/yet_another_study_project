@@ -3,16 +3,12 @@ package handlers
 import (
 	"fmt"
 	"net/http"
-	"html/template"
 	"encoding/json"
 	"../user"
 	"time"
 )
 
-
-
-
-func LoginPOST(w http.ResponseWriter, r *http.Request){
+func LoginPost(w http.ResponseWriter, r *http.Request){
 	defer func(w http.ResponseWriter, r *http.Request) {
         if err := recover(); err != nil {
 			http.Error(w, "", http.StatusInternalServerError)
@@ -24,7 +20,6 @@ func LoginPOST(w http.ResponseWriter, r *http.Request){
 		http.Error(w, "You must enter name and password using JSON!", http.StatusBadRequest)
 		return
 	}
-	fmt.Println(creds)
 	if creds.Password == "" || creds.User == ""{
 		http.Error(w, "You must enter name and password", http.StatusBadRequest)
 		return;
@@ -33,7 +28,7 @@ func LoginPOST(w http.ResponseWriter, r *http.Request){
 		http.Error(w, "Wrong username or password", http.StatusUnauthorized)
 		return
 	}
-	accessTocken, err := user.GenerateJwtTocken(time.Now().Add(5 * time.Minute), creds.User)
+	accessTocken, err := user.GenerateJwtTocken(time.Now().Add(user.TokenLifeTime), creds.User)
 	if err != nil{
 		http.Error(w, "", http.StatusInternalServerError)
 		return
@@ -44,26 +39,49 @@ func LoginPOST(w http.ResponseWriter, r *http.Request){
 		HttpOnly : true,
 	})
 	fmt.Fprintf(w,"Successfully signed in")
-	fmt.Println(accessTocken)
-
 }
 
-func LoginGET(w http.ResponseWriter, r *http.Request){
-	if r.Method == "GET"{
-		tokenCookie, err := r.Cookie("token")
-		if err != nil {
-			fmt.Fprintf(w, "Hello login page with now cookies!")
-		}
-		fmt.Fprintf(w, "Hello login page! %v", tokenCookie.Value)
+func LoginGet(w http.ResponseWriter, r *http.Request){
+	tokenCookie, err := r.Cookie("token")
+	if err != nil {
+		fmt.Fprintf(w, "Hello login page with now cookies!")
 	}
+	fmt.Fprintf(w, "Hello login page! %v", tokenCookie.Value)
+	
+}
+
+func RegisterGet(w http.ResponseWriter, r *http.Request){
+	tokenCookie, err := r.Cookie("token")
+	if err != nil {
+		fmt.Fprintf(w, "Hello register page with now cookies!")
+	}
+	fmt.Fprintf(w, "Hello register page! %v", tokenCookie.Value)
+}
+
+func RegisterPost(w http.ResponseWriter, r *http.Request){
+	var creds user.AuthCreds
+	err := json.NewDecoder(r.Body).Decode(&creds)
+	if err != nil{
+		http.Error(w, "You must enter name and password using JSON!", http.StatusBadRequest)
+		return
+	}
+	if creds.Password == "" || creds.User == ""{
+		http.Error(w, "You must enter name and password", http.StatusBadRequest)
+		return;
+	}
+	if !user.RegisterUser(creds.User, creds.Password){
+		http.Error(w, "Username already registered", http.StatusBadRequest)
+		return
+	}
+	fmt.Fprintf(w, "Signed up user %v", creds.User)
 }
 
 func Login(w http.ResponseWriter, r *http.Request) {
 	switch r.Method{
 	case "GET":
-		LoginGET(w, r)
+		LoginGet(w, r)
 	case "POST":
-		LoginPOST(w, r)
+		LoginPost(w, r)
 	default:
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -71,29 +89,25 @@ func Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func Register(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("Method:", r.Method)
-	if r.Method == "GET" {
-		t, err := template.ParseFiles("./forms/mainpage.html")
-		if err != nil{
-			fmt.Println("Cant parse")
-		}
-		t.Execute(w, nil)
-	} else {
-		r.ParseForm()
-		fmt.Println("User:", r.Form["username"])
-		fmt.Println("Password:", r.Form["password"])
+	switch r.Method{
+	case "GET":
+		RegisterGet(w, r)
+	case "POST":
+		RegisterPost(w, r)
+	default:
+		w.WriteHeader(http.StatusUnauthorized)
+		return
 	}
 }
 
 func MainMage(w http.ResponseWriter, r *http.Request) {
-	if r.Method == "GET"{
-		tokenCookie, err := r.Cookie("token")
-		if err != nil {
-			fmt.Println("No cookie")
-			fmt.Fprintf(w, "Hello main page with now cookies!")
-			return;
-		}
-		fmt.Println(tokenCookie)
-		fmt.Fprintf(w, "Hello main page!")
+	if r.Method == "GET" {
+	statusToken, username := user.VerifyToken(w, r)
+	if statusToken != user.TokenOK{
+		user.HandleToken(statusToken, username, w)
+	}
+	fmt.Fprintf(w, "Hello main page!")
+	}else{
+		http.Error(w, "", http.StatusBadRequest)
 	}
 }

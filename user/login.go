@@ -6,6 +6,9 @@ import(
 	_ "github.com/lib/pq"
 	"errors"
 	"time"
+	"net/http"
+	"fmt"
+	"math"
 )
 
 type AuthCreds struct{
@@ -13,10 +16,76 @@ type AuthCreds struct{
 	Password string
 }
 
+type UserVerifyStatus int
+
+const (
+	TokenOK UserVerifyStatus = iota + 1
+	NeedToRefresh
+	TokenTooOld 
+	TokenMalformed
+	NoSuchUser
+)
 var PrivateKey []byte
+
+var maxTimeDelay, TokenLifeTime time.Duration
 
 func init() {
 	PrivateKey = []byte("hehe")
+	maxTimeDelay = time.Hour * 40
+	TokenLifeTime = time.Minute * 5
+}
+
+func HandleToken(statusToken UserVerifyStatus, username string, w http.ResponseWriter){
+	switch statusToken{
+	case NoSuchUser:	
+		fallthrough
+	case TokenMalformed:
+		http.Error(w, "", http.StatusBadRequest)
+	case TokenTooOld:
+		http.Error(w, "", http.StatusUnauthorized)
+	case NeedToRefresh:
+		accessTocken, err := GenerateJwtTocken(time.Now().Add(TokenLifeTime), username)
+		if err != nil{
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+		http.SetCookie(w, &http.Cookie{
+			Name:    "token",
+			Value:   accessTocken,
+			HttpOnly : true,
+		})
+		
+	}
+}
+
+func VerifyToken(w http.ResponseWriter, r *http.Request) (UserVerifyStatus, string){
+	tokenString, err := r.Cookie("token")
+	if err != nil{
+		fmt.Println(err)
+		return TokenMalformed, ""
+	}
+	token, err := jwt.Parse(tokenString.Value, nil)
+	if err.(*jwt.ValidationError).Errors & jwt.ValidationErrorMalformed > 0 || token == nil{
+		fmt.Println(err)
+		return TokenMalformed, ""
+	}
+	claims := token.Claims.(jwt.MapClaims)
+	username := claims["username"]
+	expTimeRaw := claims["exp"].(float64)
+	sec, dec := math.Modf(expTimeRaw)
+	expTime := time.Unix(int64(sec), int64(dec*(1e9)))
+	timeNow := time.Now()
+	if expTime.Before(timeNow) && expTime.Before(timeNow.Add(maxTimeDelay)){
+		return NeedToRefresh, username.(string)
+	}else if expTime.Before(timeNow){
+		return TokenTooOld, ""
+	}
+	rows := db.DbConn.QueryRow("SELECT passwd FROM public.users WHERE username = $1", username)
+	var db_passwd *string
+	if err := rows.Scan(&db_passwd); err != nil {
+		return NoSuchUser, ""
+	}
+	return TokenOK, username.(string)
 }
 
 func GenerateJwtTocken(exp time.Time, username string) (string, error){
@@ -28,6 +97,7 @@ func GenerateJwtTocken(exp time.Time, username string) (string, error){
 	if err != nil {
 	   return "", errors.New("Internal error")
 	}
+	fmt.Println(token)
 	return token, nil
 }
 
@@ -43,29 +113,10 @@ func AuthByPassword(password, username string) bool{
 	return true
 }
 
-
-/*
-func GenerateSalt(saltSize int)[]byte{
-	var salt = make([]byte, saltSize)
-	_, err := rand.Read(salt)
-	if err != nil{
-		return nil
+func RegisterUser(username, password string) bool{
+	_, err:= db.DbConn.Query("INSERT INTO public.users (username, passwd) VALUES($1, $2)", username, password)
+	if err!= nil{
+		return false
 	}
-	return salt
+	return true
 }
-
-func GenerateTocken(password []byte)string{
-	salt := GenerateSalt(16)
-	if salt == nil{
-		return ""
-	}
-	var sha512 = sha512.New()
-	var passwordWithSalt = make([]byte, 64)
-	passwordWithSalt = append(passwordWithSalt, password...)
-	passwordWithSalt = append(passwordWithSalt, salt...)
-	sha512.Write(passwordWithSalt)
-   	hashPassword := sha512.Sum(nil)
-	var encodedHash = base64.URLEncoding.EncodeToString(hashPassword)
-	return encodedHash
-}
-*/
