@@ -12,6 +12,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE users(
     username varchar NOT NULL,
     passwd varchar NOT NULL,
+    signed_in boolean DEFAULT false,
     PRIMARY KEY (username)
 );
 

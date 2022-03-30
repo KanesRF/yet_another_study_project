@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"../user"
 	"time"
+	"../db"
 )
 
 func LoginPost(w http.ResponseWriter, r *http.Request){
@@ -30,6 +31,11 @@ func LoginPost(w http.ResponseWriter, r *http.Request){
 	}
 	accessTocken, err := user.GenerateJwtTocken(time.Now().Add(user.TokenLifeTime), creds.User)
 	if err != nil{
+		http.Error(w, "", http.StatusInternalServerError)
+		return
+	}
+	_, err = db.DbConn.Query("UPDATE public.users set signed_in = $1", true)
+	if err!= nil{
 		http.Error(w, "", http.StatusInternalServerError)
 		return
 	}
@@ -76,6 +82,24 @@ func RegisterPost(w http.ResponseWriter, r *http.Request){
 	fmt.Fprintf(w, "Signed up user %v", creds.User)
 }
 
+func Logout(w http.ResponseWriter, r *http.Request){
+	if r.Method == "POST" {
+		statusToken, username := user.VerifyToken(w, r)
+		if statusToken != user.TokenOK{
+			if !user.HandleToken(statusToken, username, w){
+				return
+			}
+		}
+		_, err := db.DbConn.Query("UPDATE public.users set signed_in = $1", false)
+		if err!= nil{
+			http.Error(w, "", http.StatusInternalServerError)
+			return
+		}
+	}else{
+		http.Error(w, "", http.StatusBadRequest)
+	}
+}
+
 func Login(w http.ResponseWriter, r *http.Request) {
 	switch r.Method{
 	case "GET":
@@ -102,11 +126,13 @@ func Register(w http.ResponseWriter, r *http.Request) {
 
 func MainMage(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-	statusToken, username := user.VerifyToken(w, r)
-	if statusToken != user.TokenOK{
-		user.HandleToken(statusToken, username, w)
-	}
-	fmt.Fprintf(w, "Hello main page!")
+		statusToken, username := user.VerifyToken(w, r)
+		if statusToken != user.TokenOK{
+			if !user.HandleToken(statusToken, username, w){
+				return
+			}
+		}
+		fmt.Fprintf(w, "Hello main page!")
 	}else{
 		http.Error(w, "", http.StatusBadRequest)
 	}
