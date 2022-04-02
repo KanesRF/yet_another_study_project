@@ -1,7 +1,8 @@
-package user
+package auth
 
 import(
 	"github.com/dgrijalva/jwt-go"
+	"golang.org/x/crypto/bcrypt"
 	"../db"
 	_ "github.com/lib/pq"
 	"errors"
@@ -120,20 +121,25 @@ func GenerateJwtTocken(exp time.Time, username string) (string, error){
 
 func AuthByPassword(password, username string) bool{
 	rows := db.DbConn.QueryRow("SELECT passwd FROM public.users WHERE username = $1", username)
-	var db_passwd *string
+	var db_passwd []byte
 	if err := rows.Scan(&db_passwd); err != nil {
 		return false
 	}
-	if password != *db_passwd{
+	if err := bcrypt.CompareHashAndPassword(db_passwd, []byte(password)); err != nil {
 		return false
 	}
 	return true
 }
 
 func RegisterUser(username, password string) bool{
-	_, err:= db.DbConn.Query("INSERT INTO public.users (username, passwd) VALUES($1, $2)", username, password)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return false
+	}
+	rows, err:= db.DbConn.Query("INSERT INTO public.users (username, passwd) VALUES($1, $2)", username, string(hash))
 	if err!= nil{
 		return false
 	}
+	defer rows.Close()
 	return true
 }
