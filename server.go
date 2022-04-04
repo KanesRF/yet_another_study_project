@@ -12,7 +12,7 @@ func main() {
 	http.HandleFunc("/login", handlers.Login)
 	http.HandleFunc("/logout", handlers.Logout)
 	http.HandleFunc("/register", handlers.Register)
-	http.HandleFunc("/", handlers.MainMage)
+	http.HandleFunc("/", handlers.MainPage)
 	err := http.ListenAndServe(":9090", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)

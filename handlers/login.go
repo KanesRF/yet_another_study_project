@@ -49,11 +49,11 @@ func LoginPost(w http.ResponseWriter, r *http.Request){
 }
 
 func LoginGet(w http.ResponseWriter, r *http.Request){
-	tokenCookie, err := r.Cookie("token")
+	_, err := r.Cookie("token")
 	if err != nil {
-		fmt.Fprintf(w, "Hello login page with now cookies!")
+		fmt.Fprintf(w, "Hello login page with cookies!")
 	}
-	fmt.Fprintf(w, "Hello login page! %v", tokenCookie.Value)
+	fmt.Fprintf(w, "Hello login page!")
 	
 }
 

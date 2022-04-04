@@ -7,11 +7,11 @@ import (
 )
 
 func RegisterGet(w http.ResponseWriter, r *http.Request){
-	tokenCookie, err := r.Cookie("token")
+	_, err := r.Cookie("token")
 	if err != nil {
 		fmt.Fprintf(w, "Hello register page with now cookies!")
 	}
-	fmt.Fprintf(w, "Hello register page! %v", tokenCookie.Value)
+	fmt.Fprintf(w, "Hello register page!")
 }
 
 func RegisterPost(w http.ResponseWriter, r *http.Request){
