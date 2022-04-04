@@ -77,6 +77,10 @@ func fitnesCalculator(ch <-chan *Chromosome, dataset []DatasetNode, wg *sync.Wai
 	}
 }
 
+func makeOffspring(parents []Chromosome)[]Chromosome{
+
+}
+
 func selection(population []Chromosome)[]Chromosome{
 	parentCandidates := make([]Chromosome, 0, len(population) / 2)
 	for len(population) > 1{
@@ -86,9 +90,10 @@ func selection(population []Chromosome)[]Chromosome{
 		for second == first{
 			if second < len(population) - 1	{
 				second++
-			}
-			if second > 0{
+			}else if second > 0{
 				second --
+			}else{
+				break
 			}
 		}
 		parentCandidates = append(parentCandidates, population[first], population[second])
@@ -118,7 +123,7 @@ func GaEducate(dataset []DatasetNode, epochNum int) []Chromosome{
 		//selection phase
 		selectedPopulation := selection(currentPopulation)
 		//make offspring
-		
+		children := crossover(selectedPopulation)
 	}
 	return nil
 }
