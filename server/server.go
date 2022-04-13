@@ -1,10 +1,10 @@
 package main
 
 import (
+	"ga_server/db"
+	"ga_server/handlers"
 	"log"
 	"net/http"
-	"./handlers"
-	"./db"
 )
 
 func main() {
