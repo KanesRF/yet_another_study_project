@@ -1,19 +1,19 @@
 package auth
 
-import(
-	"github.com/dgrijalva/jwt-go"
-	"golang.org/x/crypto/bcrypt"
-	"../db"
-	_ "github.com/lib/pq"
+import (
 	"errors"
-	"time"
-	"net/http"
 	"fmt"
+	"ga_server/db"
+	"github.com/dgrijalva/jwt-go"
+	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 	"math"
+	"net/http"
+	"time"
 )
 
-type AuthCreds struct{
-	User string
+type AuthCreds struct {
+	User     string
 	Password string
 }
 
@@ -22,13 +22,14 @@ type UserVerifyStatus int
 const (
 	TokenOK UserVerifyStatus = iota + 1
 	NeedToRefresh
-	TokenTooOld 
+	TokenTooOld
 	TokenMalformed
 	NoSuchUser
 	InternalError
 	UserLoggedOut
 	TokenSignErr
 )
+
 var PrivateKey []byte
 
 var maxTimeDelay, TokenLifeTime time.Duration
@@ -39,9 +40,9 @@ func init() {
 	TokenLifeTime = time.Minute * 95
 }
 
-func HandleToken(statusToken UserVerifyStatus, username string, w http.ResponseWriter) bool{
-	switch statusToken{
-	case NoSuchUser:	
+func HandleToken(statusToken UserVerifyStatus, username string, w http.ResponseWriter) bool {
+	switch statusToken {
+	case NoSuchUser:
 		fallthrough
 	case TokenMalformed:
 		http.Error(w, "", http.StatusBadRequest)
@@ -58,29 +59,29 @@ func HandleToken(statusToken UserVerifyStatus, username string, w http.ResponseW
 		return false
 	case NeedToRefresh:
 		accessTocken, err := GenerateJwtTocken(time.Now().Add(TokenLifeTime), username)
-		if err != nil{
+		if err != nil {
 			http.Error(w, "", http.StatusInternalServerError)
 			return false
 		}
 		http.SetCookie(w, &http.Cookie{
-			Name:    "token",
-			Value:   accessTocken,
-			HttpOnly : true,
+			Name:     "token",
+			Value:    accessTocken,
+			HttpOnly: true,
 		})
-		
+
 	}
 	return true
 }
 
-func VerifyToken(w http.ResponseWriter, r *http.Request) (UserVerifyStatus, string){
+func VerifyToken(w http.ResponseWriter, r *http.Request) (UserVerifyStatus, string) {
 	tokenString, err := r.Cookie("token")
-	if err != nil{
+	if err != nil {
 		return TokenMalformed, ""
 	}
 	token, err := jwt.Parse(tokenString.Value, func(token *jwt.Token) (interface{}, error) {
 		return PrivateKey, nil
 	})
-	if err != nil && err.(*jwt.ValidationError).Errors != jwt.ValidationErrorExpired || token == nil{
+	if err != nil && err.(*jwt.ValidationError).Errors != jwt.ValidationErrorExpired || token == nil {
 		return TokenSignErr, ""
 	}
 	claims := token.Claims.(jwt.MapClaims)
@@ -89,9 +90,9 @@ func VerifyToken(w http.ResponseWriter, r *http.Request) (UserVerifyStatus, stri
 	sec, dec := math.Modf(expTimeRaw)
 	expTime := time.Unix(int64(sec), int64(dec*(1e9)))
 	timeNow := time.Now()
-	if expTime.Before(timeNow) && expTime.Before(timeNow.Add(maxTimeDelay)){
+	if expTime.Before(timeNow) && expTime.Before(timeNow.Add(maxTimeDelay)) {
 		return NeedToRefresh, username.(string)
-	}else if expTime.Before(timeNow){
+	} else if expTime.Before(timeNow) {
 		return TokenTooOld, ""
 	}
 	//Is it bad? yes, but I dont want to make one more database request per HTTP request
@@ -100,26 +101,26 @@ func VerifyToken(w http.ResponseWriter, r *http.Request) (UserVerifyStatus, stri
 	if err := rows.Scan(&signedIn); err != nil {
 		return NoSuchUser, ""
 	}
-	if !signedIn{
+	if !signedIn {
 		return UserLoggedOut, username.(string)
 	}
 	return TokenOK, username.(string)
 }
 
-func GenerateJwtTocken(exp time.Time, username string) (string, error){
+func GenerateJwtTocken(exp time.Time, username string) (string, error) {
 	claims := jwt.MapClaims{}
 	claims["username"] = username
 	claims["exp"] = exp.Unix()
 	tmp_tocken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	token, err := tmp_tocken.SignedString(PrivateKey)
 	if err != nil {
-	   return "", errors.New("Internal error")
+		return "", errors.New("Internal error")
 	}
 	fmt.Println(token)
 	return token, nil
 }
 
-func AuthByPassword(password, username string) bool{
+func AuthByPassword(password, username string) bool {
 	rows := db.DbConn.QueryRow("SELECT passwd FROM public.users WHERE username = $1", username)
 	var db_passwd []byte
 	if err := rows.Scan(&db_passwd); err != nil {
@@ -131,13 +132,13 @@ func AuthByPassword(password, username string) bool{
 	return true
 }
 
-func RegisterUser(username, password string) bool{
+func RegisterUser(username, password string) bool {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return false
 	}
-	rows, err:= db.DbConn.Query("INSERT INTO public.users (username, passwd) VALUES($1, $2)", username, string(hash))
-	if err!= nil{
+	rows, err := db.DbConn.Query("INSERT INTO public.users (username, passwd) VALUES($1, $2)", username, string(hash))
+	if err != nil {
 		return false
 	}
 	defer rows.Close()
