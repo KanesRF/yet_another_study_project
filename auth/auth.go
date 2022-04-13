@@ -111,7 +111,7 @@ func VerifyToken(w http.ResponseWriter, r *http.Request) (UserVerifyStatus, stri
 	return TokenOK, username.(string)
 }
 
-func GenerateJwtTocken(exp time.Time, username string) (string, error) {
+func GenerateJwtToken(exp time.Time, username string) (string, error) {
 	claims := jwt.MapClaims{}
 	claims["username"] = username
 	claims["exp"] = exp.Unix()
