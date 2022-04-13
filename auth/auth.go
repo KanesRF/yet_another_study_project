@@ -62,7 +62,7 @@ func HandleToken(statusToken UserVerifyStatus, username string, w http.ResponseW
 		http.Error(w, "", http.StatusUnauthorized)
 		err = errors.New("token: token invalid")
 	case NeedToRefresh:
-		accessToken, err := GenerateJwtTocken(time.Now().Add(TokenLifeTime), username)
+		accessToken, err := GenerateJwtToken(time.Now().Add(TokenLifeTime), username)
 		if err != nil {
 			http.Error(w, "", http.StatusInternalServerError)
 			break
@@ -94,7 +94,7 @@ func VerifyToken(w http.ResponseWriter, r *http.Request) (UserVerifyStatus, stri
 	sec, dec := math.Modf(expTimeRaw)
 	expTime := time.Unix(int64(sec), int64(dec*(1e9)))
 	timeNow := time.Now()
-	if expTime.Before(timeNow) && expTime.Before(timeNow.Add(maxTimeDelay)) {
+	if expTime.Before(timeNow) && timeNow.Before(expTime.Add(maxTimeDelay)) {
 		return NeedToRefresh, username.(string)
 	} else if expTime.Before(timeNow) {
 		return TokenTooOld, ""

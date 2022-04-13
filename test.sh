@@ -1,7 +1,7 @@
 #just some testing requests
 
 curl -H "Content-Type: application/json" \
---cookie "token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NDg2ODQwMTIsInVzZXJuYW1lIjoiVG9tIn0.aCOf0p2q61xhidOwEFVAC94bbqtcxfuu_KNV3lj3qPk" \
+--cookie "token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE2NDk4ODU1ODksInVzZXJuYW1lIjoiVG9tIn0.uSrBS01G4JcKuXUSJdePeo-P0lrcIhanorMxDaujG5A" \
 -X GET http://localhost:9090/
 
 curl -H "Content-Type: application/json" -d '{"User":"Tom","Password":"12345"}' -X POST http://localhost:9090/register 

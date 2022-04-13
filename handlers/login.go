@@ -25,7 +25,7 @@ func LoginPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Wrong username or password", http.StatusUnauthorized)
 		return
 	}
-	accessToken, err := auth.GenerateJwtTocken(time.Now().Add(auth.TokenLifeTime), creds.User)
+	accessToken, err := auth.GenerateJwtToken(time.Now().Add(auth.TokenLifeTime), creds.User)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		return
