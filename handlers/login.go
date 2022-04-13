@@ -10,13 +10,9 @@ import (
 )
 
 func LoginPost(w http.ResponseWriter, r *http.Request) {
-	defer func(w http.ResponseWriter, r *http.Request) {
-		if err := recover(); err != nil {
-			http.Error(w, "", http.StatusInternalServerError)
-		}
-	}(w, r)
 	var creds auth.AuthCreds
 	err := json.NewDecoder(r.Body).Decode(&creds)
+	defer r.Body.Close()
 	if err != nil {
 		http.Error(w, "You must enter name and password using JSON!", http.StatusBadRequest)
 		return
@@ -29,7 +25,7 @@ func LoginPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Wrong username or password", http.StatusUnauthorized)
 		return
 	}
-	accessTocken, err := auth.GenerateJwtTocken(time.Now().Add(auth.TokenLifeTime), creds.User)
+	accessToken, err := auth.GenerateJwtTocken(time.Now().Add(auth.TokenLifeTime), creds.User)
 	if err != nil {
 		http.Error(w, "", http.StatusInternalServerError)
 		return
@@ -42,10 +38,9 @@ func LoginPost(w http.ResponseWriter, r *http.Request) {
 	defer rows.Close()
 	http.SetCookie(w, &http.Cookie{
 		Name:     "token",
-		Value:    accessTocken,
+		Value:    accessToken,
 		HttpOnly: true,
 	})
-	fmt.Fprintf(w, "Successfully signed in")
 }
 
 func LoginGet(w http.ResponseWriter, r *http.Request) {

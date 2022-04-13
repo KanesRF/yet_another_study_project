@@ -10,7 +10,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "POST" {
 		statusToken, username := auth.VerifyToken(w, r)
 		if statusToken != auth.TokenOK {
-			if !auth.HandleToken(statusToken, username, w) {
+			if err := auth.HandleToken(statusToken, username, w); err != nil {
 				return
 			}
 		}

@@ -32,7 +32,10 @@ const (
 
 var PrivateKey []byte
 
-var maxTimeDelay, TokenLifeTime time.Duration
+var (
+	TokenLifeTime time.Duration
+	maxTimeDelay  time.Duration
+)
 
 func init() {
 	PrivateKey = []byte("hehe")
@@ -40,37 +43,38 @@ func init() {
 	TokenLifeTime = time.Minute * 95
 }
 
-func HandleToken(statusToken UserVerifyStatus, username string, w http.ResponseWriter) bool {
+func HandleToken(statusToken UserVerifyStatus, username string, w http.ResponseWriter) error {
+	var err error = nil
 	switch statusToken {
 	case NoSuchUser:
 		fallthrough
 	case TokenMalformed:
 		http.Error(w, "", http.StatusBadRequest)
-		return false
+		err = errors.New("token: token malformed")
 	case InternalError:
 		http.Error(w, "", http.StatusInternalServerError)
-		return false
+		err = errors.New("token: internal error during processing")
 	case UserLoggedOut:
 		fallthrough
 	case TokenSignErr:
 		fallthrough
 	case TokenTooOld:
 		http.Error(w, "", http.StatusUnauthorized)
-		return false
+		err = errors.New("token: token invalid")
 	case NeedToRefresh:
-		accessTocken, err := GenerateJwtTocken(time.Now().Add(TokenLifeTime), username)
+		accessToken, err := GenerateJwtTocken(time.Now().Add(TokenLifeTime), username)
 		if err != nil {
 			http.Error(w, "", http.StatusInternalServerError)
-			return false
+			break
 		}
 		http.SetCookie(w, &http.Cookie{
 			Name:     "token",
-			Value:    accessTocken,
+			Value:    accessToken,
 			HttpOnly: true,
 		})
 
 	}
-	return true
+	return err
 }
 
 func VerifyToken(w http.ResponseWriter, r *http.Request) (UserVerifyStatus, string) {
@@ -111,8 +115,8 @@ func GenerateJwtTocken(exp time.Time, username string) (string, error) {
 	claims := jwt.MapClaims{}
 	claims["username"] = username
 	claims["exp"] = exp.Unix()
-	tmp_tocken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	token, err := tmp_tocken.SignedString(PrivateKey)
+	tmpToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token, err := tmpToken.SignedString(PrivateKey)
 	if err != nil {
 		return "", errors.New("Internal error")
 	}
@@ -122,11 +126,11 @@ func GenerateJwtTocken(exp time.Time, username string) (string, error) {
 
 func AuthByPassword(password, username string) bool {
 	rows := db.DbConn.QueryRow("SELECT passwd FROM public.users WHERE username = $1", username)
-	var db_passwd []byte
-	if err := rows.Scan(&db_passwd); err != nil {
+	var dbPasswd []byte
+	if err := rows.Scan(&dbPasswd); err != nil {
 		return false
 	}
-	if err := bcrypt.CompareHashAndPassword(db_passwd, []byte(password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword(dbPasswd, []byte(password)); err != nil {
 		return false
 	}
 	return true
